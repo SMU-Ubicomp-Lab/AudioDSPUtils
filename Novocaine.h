@@ -92,6 +92,8 @@ typedef void (^InputBlock)(float *data, UInt32 numFrames, UInt32 numChannels);
 @property float *outData;
 @property (nonatomic) BOOL shouldSaveContinuouslySampledMicrophoneAudioDataToNewFile; //
 
+@property (nonatomic, strong) NSString *audioFileWrittenOut;
+
 
 // Singleton methods
 + (Novocaine *) audioManager;

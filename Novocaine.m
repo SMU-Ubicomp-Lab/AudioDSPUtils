@@ -61,6 +61,7 @@
 @property (nonatomic, strong) NSTimer *audioFileTimer;
 @property (nonatomic) float *outputBuffer;
 
+
 - (void)setupAudio;
 
 - (NSString *)applicationDocumentsDirectory;
@@ -119,6 +120,7 @@ static pthread_mutex_t outputAudioFileLock;
         _shouldUseAudioFromFile = NO;
         _audioFileTimer = nil;
         _shouldSaveContinuouslySampledMicrophoneAudioDataToNewFile = NO;
+        _audioFileWrittenOut = nil;
 		
 		return self;
 		
@@ -1003,6 +1005,8 @@ void CheckError(OSStatus error, const char *operation)
     NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
     NSString *documentsPath = [paths objectAtIndex:0]; //Get the docs directory
     NSString *timeString = [NSString stringWithFormat:@"%f.m4a",[[NSDate date] timeIntervalSince1970]]; // get UTC time string
+    
+    self.audioFileWrittenOut = timeString;
     NSString *source = [documentsPath stringByAppendingPathComponent:timeString]; //Add the file name
     
     const char *cString = [source cStringUsingEncoding:NSASCIIStringEncoding];
