@@ -151,10 +151,7 @@ static pthread_mutex_t outputAudioFileLock;
 -(void)setShouldSaveContinuouslySampledMicrophoneAudioDataToNewFile:(BOOL)shouldSaveContinuouslySampledMicrophoneAudioDataToNewFile {
     if(!self.playing) // don't allow changes midstream, as this could cause a buidlup of unclosed files on the disk
     {
-        if(_shouldUseAudioFromFile==NO )
-            _shouldSaveContinuouslySampledMicrophoneAudioDataToNewFile = shouldSaveContinuouslySampledMicrophoneAudioDataToNewFile;
-        else
-            _shouldSaveContinuouslySampledMicrophoneAudioDataToNewFile = NO; // don't allow saving if the audio file is there
+        _shouldSaveContinuouslySampledMicrophoneAudioDataToNewFile = shouldSaveContinuouslySampledMicrophoneAudioDataToNewFile;
     }
     
     // next time the play button is set, we will create an audio file if this was set to true
@@ -460,7 +457,7 @@ static pthread_mutex_t outputAudioFileLock;
 	}
     
     
-    // Slap a render callback on the unit
+    // setup a render callback on the unit
     AURenderCallbackStruct callbackStruct;
     callbackStruct.inputProc = inputCallback;
     callbackStruct.inputProcRefCon = (__bridge void *)(self);
@@ -519,6 +516,10 @@ static pthread_mutex_t outputAudioFileLock;
         
         // setup audio file for continuous reading
         float preferredTimeInterval = [self initAudioFileForReadingWithName:self.audioFileName];
+        
+        // if saving microphone data to audio file, setup the file
+        if(self.shouldSaveContinuouslySampledMicrophoneAudioDataToNewFile)
+            [self setupAudioFileForWritingFromMicrophone];
         
         // turn on timer function for releasing audio to the input block in 1024 sample chunks
         // using "timer" so don't get too comfortable with the actual timing, its just a preferred interval
@@ -641,8 +642,6 @@ OSStatus inputCallback   (void						*inRefCon,
         }
         pthread_mutex_unlock( &outputAudioFileLock );
         
-        //SInt64 frameOffset = 0;
-        //ExtAudioFileTell(sm.audioFileRefOutput, &frameOffset);
     }
     
     return noErr;
@@ -735,6 +734,7 @@ void sessionPropertyListener(void *                  inClientData,
     {
         NSLog(@"Begin interuption");
         self.inputAvailable = NO;
+        [self pause];
     }
     else if (AVAudioSessionInterruptionTypeEnded == interruptionType)
     {
@@ -969,6 +969,28 @@ void CheckError(OSStatus error, const char *operation)
             if(self.inputBlock != nil)
                 self.inputBlock(samplesAsCArray, _audioFileFrameCount, numChannels);
         });
+        
+        // save audio data to file if we are told to do so
+        if(self.shouldSaveContinuouslySampledMicrophoneAudioDataToNewFile){
+            //ExtAudioFileWrite(sm.audioFileRefOutput,inNumberFrames,sm.inputBuffer);
+            //ExtAudioFileWriteAsync(sm.audioFileRefOutput,inNumberFrames,sm.inputBuffer);
+            UInt32 numIncomingBytes = _audioFileFrameCount*numChannels*sizeof(float);
+            memcpy(self.outputBuffer, samplesAsCArray, numIncomingBytes);
+            
+            AudioBufferList outgoingAudio;
+            outgoingAudio.mNumberBuffers = 1;
+            outgoingAudio.mBuffers[0].mNumberChannels = _audioFileFrameCount;
+            outgoingAudio.mBuffers[0].mDataByteSize = numIncomingBytes;
+            outgoingAudio.mBuffers[0].mData = self.outputBuffer;
+            
+            if( 0 == pthread_mutex_trylock( &outputAudioFileLock ) )
+            {
+                ExtAudioFileWriteAsync(self.audioFileRefOutput, _audioFileFrameCount, &outgoingAudio);
+            }
+            pthread_mutex_unlock( &outputAudioFileLock );
+            
+        }
+
     }
     else{
         [timer invalidate];
@@ -980,7 +1002,6 @@ void CheckError(OSStatus error, const char *operation)
 -(void) overrideMicrophoneWithAudioFile:(NSString*)audioFileName{
     self.shouldUseAudioFromFile = YES;
     self.audioFileName = audioFileName;
-    self.shouldSaveContinuouslySampledMicrophoneAudioDataToNewFile = NO; // do not allow in debug
 }
 
 -(void)setDebugModeOffAndUseMicrophone{
