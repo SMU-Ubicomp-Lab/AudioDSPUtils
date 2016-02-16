@@ -81,6 +81,7 @@ static pthread_mutex_t outputAudioFileLock;
     static dispatch_once_t oncePredicate;
     
     dispatch_once(&oncePredicate,^{
+        NSLog(@"Allocating first time Novocaine object");
         _sharedInstance = [[Novocaine alloc] init];
         // Fire up the audio session ( with steady error checking ... )
         [_sharedInstance ifAudioInputIsAvailableThenSetupAudioSession];
@@ -131,6 +132,7 @@ static pthread_mutex_t outputAudioFileLock;
 
 -(void)dealloc{
     
+    NSLog(@"Deallocating Novocaine Object...");
     
     for(int i=0;i<_convertedFileData.mNumberBuffers;i++){
         free(_convertedFileData.mBuffers[i].mData);
@@ -501,7 +503,9 @@ static pthread_mutex_t outputAudioFileLock;
         if(self.shouldSaveContinuouslySampledMicrophoneAudioDataToNewFile)
             [self closeAudioFileForWritingFromMicrophone];
         
-        CheckError( AudioOutputUnitStop(_inputUnit), "Couldn't stop the output unit");
+        if(_inputUnit)
+            CheckError( AudioOutputUnitStop(_inputUnit), "Couldn't stop the output unit");
+        
 		self.playing = NO;
 	}
     
@@ -512,7 +516,13 @@ static pthread_mutex_t outputAudioFileLock;
     
     
     if(self.shouldUseAudioFromFile){ //Play from file
-        CheckError( AudioOutputUnitStop(_inputUnit), "Couldn't stop the output unit");
+        
+        // play from the microphone
+        AVAudioSession *session =  [AVAudioSession sharedInstance];
+        
+        if(_inputUnit && session && session.isInputAvailable){
+            CheckError( AudioOutputUnitStop(_inputUnit), "Couldn't stop the output unit");
+        }
         
         // setup audio file for continuous reading
         float preferredTimeInterval = [self initAudioFileForReadingWithName:self.audioFileName];
