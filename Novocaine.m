@@ -1035,7 +1035,7 @@ void CheckError(OSStatus error, const char *operation)
     
     NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
     NSString *documentsPath = [paths objectAtIndex:0]; //Get the docs directory
-    NSString *timeString = [NSString stringWithFormat:@"%f.m4a",[[NSDate date] timeIntervalSince1970]]; // get UTC time string
+    NSString *timeString = [NSString stringWithFormat:@"%f.wav",[[NSDate date] timeIntervalSince1970]]; // get UTC time string
     
     self.audioFileWrittenOut = timeString;
     NSString *source = [documentsPath stringByAppendingPathComponent:timeString]; //Add the file name
@@ -1049,19 +1049,36 @@ void CheckError(OSStatus error, const char *operation)
                                                 );
     
     CFURLRef outputFileURL = CFURLCreateWithFileSystemPath(
-                                                          kCFAllocatorDefault,
-                                                          str,
-                                                          kCFURLPOSIXPathStyle,
-                                                          false
-                                                          );
+                                                           kCFAllocatorDefault,
+                                                           str,
+                                                           kCFURLPOSIXPathStyle,
+                                                           false
+                                                           );
     
     // Create a file for writing to
     
     AudioStreamBasicDescription audioFormat;
     
-    AudioStreamBasicDescription outputFileDesc = {44100.0,  kAudioFormatMPEG4AAC, 0, 0, 1024, 0, self.numInputChannels, 0, 0};
+    //works: kAudioFormatMPEG4AAC & kAudioFileM4AType
+    AudioStreamBasicDescription outputFileDesc;// = {44100.0,  kAudioFormatLinearPCM, 0, 0, 1024, 0, self.numInputChannels, 0, 0};
     
-    CheckError(ExtAudioFileCreateWithURL(outputFileURL, kAudioFileM4AType, &outputFileDesc, NULL, kAudioFileFlags_EraseFile, &_audioFileRefOutput), "Creating file");
+    outputFileDesc.mSampleRate = 44100.0;
+    outputFileDesc.mFormatID = kAudioFormatLinearPCM; //kAudioFormatMPEG4AAC
+    outputFileDesc.mFormatFlags =  kAudioFormatFlagIsSignedInteger | kAudioFormatFlagsNativeEndian |kLinearPCMFormatFlagIsPacked;
+    outputFileDesc.mBytesPerPacket = self.numInputChannels*2;
+    outputFileDesc.mFramesPerPacket = 1;
+    outputFileDesc.mBytesPerFrame = self.numInputChannels*2;
+    outputFileDesc.mChannelsPerFrame = self.numInputChannels;
+    outputFileDesc.mBitsPerChannel = 16;
+    
+    //not works: kAudioFormatLinearPCM and anything, like kAudioFileWAVEType
+    CheckError(ExtAudioFileCreateWithURL(outputFileURL,
+                                         kAudioFileWAVEType,
+                                         &outputFileDesc,
+                                         NULL,
+                                         kAudioFileFlags_EraseFile,
+                                         &_audioFileRefOutput),
+               "Creating file");
     
     audioFormat.mSampleRate = self.samplingRate;
     audioFormat.mFormatID = kAudioFormatLinearPCM;
